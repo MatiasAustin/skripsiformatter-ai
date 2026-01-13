@@ -99,6 +99,9 @@ const App: React.FC = () => {
             <p className="text-sm text-slate-500 max-w-xs leading-relaxed italic">
               "Tingkatkan kualitas skripsi Anda dengan sentuhan estetik dan presisi akademik."
             </p>
+            <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-6">
+              dibuat untuk Puttt <i className="fas fa-heart ml-1"></i>
+            </p>
           </div>
         </div>
       )}
