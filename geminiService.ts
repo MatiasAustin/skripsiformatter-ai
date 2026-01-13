@@ -1,23 +1,23 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { ThesisAnalysis, AnalysisMode } from "./types";
 
 // Lazy initialization to prevent crash on load if env var is missing
-let ai: GoogleGenAI | null = null;
+let genAI: GoogleGenerativeAI | null = null;
 
-const getGenAI = (): GoogleGenAI => {
-  if (!ai) {
+const getGenAI = (): GoogleGenerativeAI => {
+  if (!genAI) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("API Key Google Gemini tidak ditemukan. Pastikan VITE_GEMINI_API_KEY sudah diset di .env atau Vercel Environment Variables.");
     }
-    ai = new GoogleGenAI({ apiKey });
+    genAI = new GoogleGenerativeAI(apiKey);
   }
-  return ai;
+  return genAI;
 };
 
 export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promise<ThesisAnalysis> => {
-  const model = "gemini-1.5-flash-001";
+  const modelName = "gemini-1.5-flash";
 
   const getSystemInstruction = (mode: AnalysisMode): string => {
     const basePuebi = `
@@ -78,32 +78,31 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
     }
   };
 
-  const response = await getGenAI().models.generateContent({
-    model: model,
-    contents: `Analisis dan rapikan teks berikut dengan mode: ${mode}.\n\nTeks:\n${text}`,
-    config: {
-      systemInstruction: getSystemInstruction(mode),
+  const model = getGenAI().getGenerativeModel({
+    model: modelName,
+    systemInstruction: getSystemInstruction(mode),
+    generationConfig: {
       responseMimeType: "application/json",
       responseSchema: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          formattedText: { type: Type.STRING, description: "Teks yang sudah dirapikan." },
+          formattedText: { type: SchemaType.STRING, description: "Teks yang sudah dirapikan." },
           suggestions: {
-            type: Type.ARRAY,
+            type: SchemaType.ARRAY,
             items: {
-              type: Type.OBJECT,
+              type: SchemaType.OBJECT,
               properties: {
-                category: { type: Type.STRING, enum: ["Grammar", "Structure", "Citation", "Tone", "Diction"] },
-                original: { type: Type.STRING },
-                suggestion: { type: Type.STRING },
-                explanation: { type: Type.STRING }
+                category: { type: SchemaType.STRING, enum: ["Grammar", "Structure", "Citation", "Tone", "Diction"] },
+                original: { type: SchemaType.STRING },
+                suggestion: { type: SchemaType.STRING },
+                explanation: { type: SchemaType.STRING }
               },
               required: ["category", "original", "suggestion", "explanation"]
             }
           },
-          score: { type: Type.NUMBER, description: "Skor kualitas tulisan 0-100." },
-          overallFeedback: { type: Type.STRING },
-          missingSections: { type: Type.ARRAY, items: { type: Type.STRING } }
+          score: { type: SchemaType.NUMBER, description: "Skor kualitas tulisan 0-100." },
+          overallFeedback: { type: SchemaType.STRING },
+          missingSections: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
         },
         required: ["formattedText", "suggestions", "score", "overallFeedback", "missingSections"]
       }
@@ -111,7 +110,8 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
   });
 
   try {
-    return JSON.parse(response.text);
+    const result = await model.generateContent(`Analisis dan rapikan teks berikut dengan mode: ${mode}.\n\nTeks:\n${text}`);
+    return JSON.parse(result.response.text());
   } catch (error) {
     console.error("Failed to parse Gemini response", error);
     throw new Error("Gagal memproses analisis teks. Silakan coba lagi.");
