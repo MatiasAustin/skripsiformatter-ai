@@ -100,7 +100,7 @@ const App: React.FC = () => {
               "Tingkatkan kualitas skripsi Kamu dengan sentuhan estetik dan presisi akademik."
               <br />
               <span className="text-[10px] text-rose-400 not-italic font-bold tracking-widest block mt-4">
-                Created for Puttt EEK <i className="fas fa-heart ml-1"></i>
+                Created for Puttt EEK
               </span>
             </p>
           </div>
