@@ -18,5 +18,6 @@ export enum AnalysisMode {
   GENERAL = 'general',
   ABSTRACT = 'abstract',
   CHAPTER = 'chapter',
-  BIBLIOGRAPHY = 'bibliography'
+  BIBLIOGRAPHY = 'bibliography',
+  PROOFREAD = 'proofread'
 }

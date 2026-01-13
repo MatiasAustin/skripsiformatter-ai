@@ -1,8 +1,9 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Header, Footer } from './components/Layout';
 import { analyzeThesisText } from './geminiService';
 import { ThesisAnalysis, AnalysisMode } from './types';
+import DiffViewer from './components/DiffViewer';
 
 declare const mammoth: any;
 
@@ -13,7 +14,26 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [mode, setMode] = useState<AnalysisMode>(AnalysisMode.GENERAL);
   const [error, setError] = useState<string | null>(null);
+  const [showDiff, setShowDiff] = useState<boolean>(false);
+  const [history, setHistory] = useState<ThesisAnalysis[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const savedUtils = localStorage.getItem('thesis_history');
+    if (savedUtils) {
+      try {
+        setHistory(JSON.parse(savedUtils));
+      } catch (e) {
+        console.error("Failed to load history", e);
+      }
+    }
+  }, []);
+
+  const saveToHistory = (newAnalysis: ThesisAnalysis) => {
+    const updated = [newAnalysis, ...history].slice(0, 10);
+    setHistory(updated);
+    localStorage.setItem('thesis_history', JSON.stringify(updated));
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -49,11 +69,18 @@ const App: React.FC = () => {
     try {
       const result = await analyzeThesisText(inputText, mode);
       setAnalysis(result);
+      saveToHistory(result);
     } catch (err: any) {
       setError(err.message || "Gagal memproses.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadFromHistory = (item: ThesisAnalysis) => {
+    setAnalysis(item);
+    // Optionally restore input text if we stored it, but analysis doesn't currently track original text input separately unless we add it to ThesisAnalysis type.
+    // For now, we assume the user just wants to see the result.
   };
 
   const renderDashboard = () => (
@@ -82,48 +109,67 @@ const App: React.FC = () => {
         <div className="lg:col-span-5 flex flex-col space-y-4">
           <div className="glass rounded-[2.5rem] p-8 min-h-[450px] flex flex-col relative overflow-hidden">
             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-900 tracking-tight">Input</h3>
-               <button 
+              <h3 className="text-xl font-bold text-slate-900 tracking-tight">Input</h3>
+              <button
                 onClick={() => fileInputRef.current?.click()}
                 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 border border-slate-200 rounded-full px-3 py-1 hover:bg-white transition"
-               >
-                 Upload .docx
-               </button>
-               <input type="file" ref={fileInputRef} className="hidden" accept=".docx" onChange={handleFileUpload} />
+              >
+                Upload .docx
+              </button>
+              <input type="file" ref={fileInputRef} className="hidden" accept=".docx" onChange={handleFileUpload} />
             </div>
-            
+
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Tempel naskah Anda di sini..."
               className="flex-grow bg-transparent outline-none resize-none academic-font text-lg leading-relaxed text-slate-700 placeholder:text-slate-300"
             />
-            
+
             <div className="mt-6 flex items-center justify-between border-t border-slate-100/50 pt-4">
-               <div className="flex space-x-2">
-                 {Object.values(AnalysisMode).map((m) => (
-                   <button 
+              <div className="flex space-x-2">
+                {Object.values(AnalysisMode).map((m) => (
+                  <button
                     key={m}
                     onClick={() => setMode(m)}
                     className={`text-[9px] font-bold uppercase tracking-tighter px-2 py-1 rounded-md transition ${mode === m ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
-                   >
-                     {m}
-                   </button>
-                 ))}
-               </div>
-               <button 
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <button
                 onClick={handleFormat}
                 disabled={isLoading}
                 className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-xl hover:scale-110 transition active:scale-90"
-               >
-                 {isLoading ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-arrow-right text-xs"></i>}
-               </button>
+              >
+                {isLoading ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-arrow-right text-xs"></i>}
+              </button>
             </div>
           </div>
-          
+
           {error && (
             <div className="px-6 py-3 glass rounded-2xl text-[11px] font-bold text-rose-500 uppercase tracking-widest text-center">
               {error}
+            </div>
+          )}
+
+          {/* History Section */}
+          {history.length > 0 && (
+            <div className="glass rounded-[2rem] p-6 space-y-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Recent History</h4>
+              <div className="space-y-2">
+                {history.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => loadFromHistory(item)}
+                    className="p-3 glass-dark rounded-xl cursor-pointer hover:bg-white/50 transition flex justify-between items-center group"
+                  >
+                    <span className="text-xs font-medium text-slate-700 truncate max-w-[200px]">{item.formattedText.substring(0, 30)}...</span>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-500">{item.score}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -139,33 +185,51 @@ const App: React.FC = () => {
                   <p className="text-7xl font-bold tracking-tighter">{analysis.score}</p>
                 </div>
                 <div className="text-right space-y-2">
-                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Academic Index</p>
-                   <button 
-                    onClick={() => setAnalysis(null)}
-                    className="text-[11px] font-bold border border-white/20 rounded-full px-6 py-2 hover:bg-white hover:text-slate-900 transition"
-                   >
-                    Discover More
-                   </button>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Academic Index</p>
+                  <div className="flex items-center space-x-2 justify-end">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 mr-2">View Mode:</span>
+                    <button
+                      onClick={() => setShowDiff(false)}
+                      className={`text-[10px] font-bold rounded-full px-4 py-1 transition ${!showDiff ? 'bg-slate-900 text-white' : 'glass border'}`}
+                    >
+                      Clean
+                    </button>
+                    <button
+                      onClick={() => setShowDiff(true)}
+                      className={`text-[10px] font-bold rounded-full px-4 py-1 transition ${showDiff ? 'bg-slate-900 text-white' : 'glass border'}`}
+                    >
+                      Compare
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Formatted Text */}
+              {/* Formatted Text / Diff Viewer */}
               <div className="glass rounded-[2.5rem] p-10 relative overflow-hidden group">
-                 <div className="flex justify-between items-center mb-8">
-                   <h3 className="text-xl font-bold text-slate-900 tracking-tight">Refined Text</h3>
-                   <button 
-                    onClick={() => navigator.clipboard.writeText(analysis.formattedText)}
-                    className="w-12 h-12 glass border-slate-200 rounded-full flex items-center justify-center text-slate-900 hover:scale-110 transition shadow-sm"
-                   >
-                     <i className="far fa-copy"></i>
-                   </button>
-                 </div>
-                 <div className="academic-font text-lg leading-[1.8] text-slate-700 max-h-[500px] overflow-y-auto pr-4">
-                   {analysis.formattedText.split('\n').map((p, i) => <p key={i} className="mb-6">{p}</p>)}
-                 </div>
-                 
-                 {/* Decorative Pink Sphere */}
-                 <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-pink-300 rounded-full opacity-30 blur-2xl pointer-events-none transition-transform group-hover:scale-150"></div>
+                <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                    {showDiff ? 'Changes Preview' : 'Refined Text'}
+                  </h3>
+                  {!showDiff && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(analysis.formattedText)}
+                      className="w-12 h-12 glass border-slate-200 rounded-full flex items-center justify-center text-slate-900 hover:scale-110 transition shadow-sm"
+                    >
+                      <i className="far fa-copy"></i>
+                    </button>
+                  )}
+                </div>
+
+                {showDiff ? (
+                  <DiffViewer original={inputText} modified={analysis.formattedText} />
+                ) : (
+                  <div className="academic-font text-lg leading-[1.8] text-slate-700 max-h-[500px] overflow-y-auto pr-4 whitespace-pre-wrap">
+                    {analysis.formattedText}
+                  </div>
+                )}
+
+                {/* Decorative Pink Sphere */}
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-pink-300 rounded-full opacity-30 blur-2xl pointer-events-none transition-transform group-hover:scale-150"></div>
               </div>
 
               {/* Suggestions Chips */}
@@ -181,14 +245,14 @@ const App: React.FC = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-[550px] space-y-6">
-               <div className="w-64 h-64 glass rounded-[3rem] border-dashed border-2 border-slate-200 flex items-center justify-center text-slate-200 relative overflow-hidden group">
-                  <i className="fas fa-sparkles text-6xl group-hover:scale-125 transition duration-700"></i>
-                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-pink-100/20 to-transparent"></div>
-               </div>
-               <div className="text-center">
-                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.4em]">Waiting for Input</p>
-                 <p className="text-xs text-slate-300 mt-2">Naskah Anda akan tampil elegan di sini.</p>
-               </div>
+              <div className="w-64 h-64 glass rounded-[3rem] border-dashed border-2 border-slate-200 flex items-center justify-center text-slate-200 relative overflow-hidden group">
+                <i className="fas fa-sparkles text-6xl group-hover:scale-125 transition duration-700"></i>
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-pink-100/20 to-transparent"></div>
+              </div>
+              <div className="text-center">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.4em]">Waiting for Input</p>
+                <p className="text-xs text-slate-300 mt-2">Naskah Anda akan tampil elegan di sini.</p>
+              </div>
             </div>
           )}
         </div>
@@ -242,9 +306,9 @@ const App: React.FC = () => {
         </div>
         <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-rose-100 rounded-full blur-3xl opacity-40 group-hover:scale-125 transition duration-1000"></div>
       </div>
-      
+
       <div className="flex justify-center">
-        <button 
+        <button
           onClick={() => setCurrentView('dashboard')}
           className="glass-dark rounded-full px-12 py-4 font-bold tracking-widest uppercase text-[11px] flex items-center space-x-4 hover:scale-105 transition shadow-2xl"
         >
@@ -259,10 +323,10 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       {/* Dynamic Background Spheres */}
       <div className="fixed top-[-10%] left-[-5%] w-[40vw] h-[40vw] bg-pink-200/20 rounded-full blur-[100px] floating"></div>
-      <div className="fixed bottom-[-10%] right-[-5%] w-[35vw] h-[35vw] bg-orange-100/20 rounded-full blur-[100px] floating" style={{animationDelay: '1s'}}></div>
-      
+      <div className="fixed bottom-[-10%] right-[-5%] w-[35vw] h-[35vw] bg-orange-100/20 rounded-full blur-[100px] floating" style={{ animationDelay: '1s' }}></div>
+
       <Header currentView={currentView} setView={setCurrentView} />
-      
+
       <main className="flex-grow max-w-7xl mx-auto px-6 lg:px-8 w-full relative z-10">
         {currentView === 'dashboard' ? renderDashboard() : renderGuide()}
       </main>
