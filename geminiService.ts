@@ -92,7 +92,7 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
             items: {
               type: SchemaType.OBJECT,
               properties: {
-                category: { type: SchemaType.STRING, enum: ["Grammar", "Structure", "Citation", "Tone", "Diction"] },
+                category: { type: SchemaType.STRING, format: "enum", enum: ["Grammar", "Structure", "Citation", "Tone", "Diction"] },
                 original: { type: SchemaType.STRING },
                 suggestion: { type: SchemaType.STRING },
                 explanation: { type: SchemaType.STRING }
