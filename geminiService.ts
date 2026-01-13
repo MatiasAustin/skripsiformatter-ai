@@ -17,7 +17,7 @@ const getGenAI = (): GoogleGenAI => {
 };
 
 export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promise<ThesisAnalysis> => {
-  const model = "gemini-1.5-pro";
+  const model = "gemini-1.5-flash";
 
   const getSystemInstruction = (mode: AnalysisMode): string => {
     const basePuebi = `
