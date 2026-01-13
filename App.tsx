@@ -98,9 +98,10 @@ const App: React.FC = () => {
             <div className="w-32 h-32 bg-orange-200 rounded-full blur-3xl opacity-30 absolute -bottom-4 -right-4"></div>
             <p className="text-sm text-slate-500 max-w-xs leading-relaxed italic">
               "Tingkatkan kualitas skripsi Anda dengan sentuhan estetik dan presisi akademik."
-            </p>
-            <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-6">
-              dibuat untuk Puttt <i className="fas fa-heart ml-1"></i>
+              <br />
+              <span className="text-[10px] text-rose-400 not-italic font-bold tracking-widest block mt-4">
+                dibuat untuk Puttt <i className="fas fa-heart ml-1"></i>
+              </span>
             </p>
           </div>
         </div>
