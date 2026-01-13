@@ -47,7 +47,7 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
       console.log(`Trying modern model: ${modelName}`);
       const model = getGenAI().getGenerativeModel({
         model: modelName,
-        systemInstruction: systemInstruction, // Using simplified instructions for compatibility
+        systemInstruction: systemInstruction,
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -78,36 +78,35 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
       const result = await model.generateContent(`Mode: ${mode}\n\nTeks: ${text}`);
       return JSON.parse(result.response.text());
     } catch (e: any) {
-      console.warn(`${modelName} failed:`, e.message);
+      console.warn(`${modelName} failed, trying next...`, e.message);
     }
   }
 
-  // 2. Fallback to Legacy Model (Prompt Engineering Mode)
-  // Use generic 'gemini-pro' which is widely available, without forced schema
+  // 2. Fallback to Legacy Model (gemini-pro) with Plain Text Prompt
   try {
     console.log("Falling back to Legacy Mode (gemini-pro)");
     const model = getGenAI().getGenerativeModel({ model: "gemini-pro" });
 
-    // Explicitly ask for JSON in the prompt for legacy models
     const prompt = `
-      ${systemInstruction}
-      
-      Mode: ${mode}
-      Teks Asli: "${text}"
-      
-      Perbaiki teks tersebut.
-      HANYA BERIKAN OUTPUT JSON RAW TEXT TANPA MARKDOWN "```json".
-      `;
+${systemInstruction}
+
+Mode: ${mode}
+Teks Asli: "${text}"
+
+Perbaiki teks tersebut.
+HANYA BERIKAN OUTPUT JSON RAW TEXT. JANGAN GUNAKAN FORMAT MARKDOWN.
+    `;
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    
-    // Clean up markdown code blocks if present
-    const cleanJson = responseText.replace(/```json / g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
+    let responseText = result.response.text();
+
+    // Clean up markdown if the model disregarded the instruction
+    responseText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    return JSON.parse(responseText);
 
   } catch (error: any) {
     console.error("Critical Failure:", error);
-    throw new Error(`Gagal memproses (Semua model sibuk atau kunci tidak valid). Error: ${error.message}`);
+    throw new Error(`Gagal memproses. Detail: ${error.message}`);
   }
 };
