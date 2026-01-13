@@ -18,12 +18,11 @@ const getGenAI = (): GoogleGenerativeAI => {
 
 export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promise<ThesisAnalysis> => {
   // Prioritized list of models to try
+  // Removing legacy models (gemini-pro) as they likely don't support the JSON schema required
   const modelsToTry = [
     "gemini-1.5-flash",
-    "gemini-1.5-flash-001",
-    "gemini-1.5-pro",
-    "gemini-1.0-pro",
-    "gemini-pro"
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro"
   ];
 
   const getSystemInstruction = (mode: AnalysisMode): string => {
@@ -129,12 +128,13 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
 
     } catch (error: any) {
       console.warn(`Failed with model ${modelName}:`, error.message);
-      lastError = error;
-      // Continue to next model
+      if (i === 0) {
+        primaryError = error; // Capture the error from the preferred model
+      }
     }
   }
 
-  // If all models fail
-  console.error("All models failed.", lastError);
-  throw new Error(`Gagal memproses. Detail: ${lastError?.message || "Model tidak tersedia."}`);
+  // If all models fail, throw the primary error (from gemini-1.5-flash) as it's the most relevant
+  console.error("All models failed.", primaryError);
+  throw new Error(`Gagal memproses. Detail: ${primaryError?.message || "Model tidak tersedia."} \n(Hint: Pastikan API Key Anda aktif dan mendukung Gemini 1.5)`);
 };
