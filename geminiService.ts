@@ -17,7 +17,14 @@ const getGenAI = (): GoogleGenerativeAI => {
 };
 
 export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promise<ThesisAnalysis> => {
-  const modelName = "gemini-1.5-flash-001";
+  // Prioritized list of models to try
+  const modelsToTry = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-001",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro",
+    "gemini-pro"
+  ];
 
   const getSystemInstruction = (mode: AnalysisMode): string => {
     const basePuebi = `
@@ -78,42 +85,56 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
     }
   };
 
-  const model = getGenAI().getGenerativeModel({
-    model: modelName,
-    systemInstruction: getSystemInstruction(mode),
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          formattedText: { type: SchemaType.STRING, description: "Teks yang sudah dirapikan." },
-          suggestions: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                category: { type: SchemaType.STRING, format: "enum", enum: ["Grammar", "Structure", "Citation", "Tone", "Diction"] },
-                original: { type: SchemaType.STRING },
-                suggestion: { type: SchemaType.STRING },
-                explanation: { type: SchemaType.STRING }
-              },
-              required: ["category", "original", "suggestion", "explanation"]
-            }
-          },
-          score: { type: SchemaType.NUMBER, description: "Skor kualitas tulisan 0-100." },
-          overallFeedback: { type: SchemaType.STRING },
-          missingSections: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
-        },
-        required: ["formattedText", "suggestions", "score", "overallFeedback", "missingSections"]
-      }
-    }
-  });
+  const systemInstruction = getSystemInstruction(mode);
+  let lastError: any;
 
-  try {
-    const result = await model.generateContent(`Analisis dan rapikan teks berikut dengan mode: ${mode}.\n\nTeks:\n${text}`);
-    return JSON.parse(result.response.text());
-  } catch (error) {
-    console.error("Failed to parse Gemini response", error);
-    throw new Error("Gagal memproses analisis teks. Silakan coba lagi.");
+  for (const modelName of modelsToTry) {
+    try {
+      console.log(`Attempting to use model: ${modelName}`);
+
+      const model = getGenAI().getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemInstruction,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+              formattedText: { type: SchemaType.STRING, description: "Teks yang sudah dirapikan." },
+              suggestions: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    category: { type: SchemaType.STRING, format: "enum", enum: ["Grammar", "Structure", "Citation", "Tone", "Diction"] },
+                    original: { type: SchemaType.STRING },
+                    suggestion: { type: SchemaType.STRING },
+                    explanation: { type: SchemaType.STRING }
+                  },
+                  required: ["category", "original", "suggestion", "explanation"]
+                }
+              },
+              score: { type: SchemaType.NUMBER, description: "Skor kualitas tulisan 0-100." },
+              overallFeedback: { type: SchemaType.STRING },
+              missingSections: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+            },
+            required: ["formattedText", "suggestions", "score", "overallFeedback", "missingSections"]
+          }
+        }
+      });
+
+      const result = await model.generateContent(`Analisis dan rapikan teks berikut dengan mode: ${mode}.\n\nTeks:\n${text}`);
+      console.log(`Success with model: ${modelName}`);
+      return JSON.parse(result.response.text());
+
+    } catch (error: any) {
+      console.warn(`Failed with model ${modelName}:`, error.message);
+      lastError = error;
+      // Continue to next model
+    }
   }
+
+  // If all models fail
+  console.error("All models failed.", lastError);
+  throw new Error(`Gagal memproses. Detail: ${lastError?.message || "Model tidak tersedia."}`);
 };
