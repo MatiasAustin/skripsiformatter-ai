@@ -85,9 +85,10 @@ export const analyzeThesisText = async (text: string, mode: AnalysisMode): Promi
   };
 
   const systemInstruction = getSystemInstruction(mode);
-  let lastError: any;
+  let primaryError: any;
 
-  for (const modelName of modelsToTry) {
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const modelName = modelsToTry[i];
     try {
       console.log(`Attempting to use model: ${modelName}`);
 
